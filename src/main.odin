@@ -7,16 +7,25 @@ Key :: rl.KeyboardKey
 MAX_COLUMNS :: 20
 MOVE_SPEED :: 0.1
 
+/// Assumes that drawing has already started
+draw_hud :: proc() {
+	rl.DrawRectangle(5, 5, 330, 100, rl.Fade(rl.Color{0, 0, 200, 0}, 0.5))
+	rl.DrawRectangleLines(5, 5, 500, 100, rl.Color{250, 255, 255, 1})
+}
+
 main :: proc() {
 	rl.InitWindow(1280, 720, "My First Game")
+
+	cameraMode := rl.CameraMode.FIRST_PERSON
 	camera: rl.Camera3D
 	camera.position = {0.0, 2.0, 4.0} // Camera position
-	camera.target = {0.0, 1.0, 0.0} // Camera looking at point
+	camera.target = {0.0, 2.0, 0.0} // Camera looking at point
 	camera.up = {0.0, 1.0, 0.0} // Camera up vector (rotation towards target)
-	camera.fovy = 90.0 // Camera field-of-view Y
+	camera.fovy = 60.0 // Camera field-of-view Y
 	camera.projection = rl.CameraProjection.PERSPECTIVE // Camera projection type
 
-
+	rl.DisableCursor()
+	rl.SetTargetFPS(60)
 	// Generates some random columns
 	heights: [MAX_COLUMNS]f32 = {}
 	positions: [MAX_COLUMNS][3]f32 = {}
@@ -40,6 +49,32 @@ main :: proc() {
 
 	for !rl.WindowShouldClose() {
 
+		/// Changing Camera Projection
+		if (rl.IsKeyPressed(Key.P)) {
+			if (camera.projection == rl.CameraProjection.PERSPECTIVE) {
+				// Create isometric view
+				cameraMode = rl.CameraMode.THIRD_PERSON
+				// Note: The target distance is related to the render distance in the orthographic projection
+				camera.position = {0.0, 2.0, -100.0}
+				camera.target = {0.0, 2.0, 0.0}
+				camera.up = {0.0, 1.0, 0.0}
+				camera.projection = rl.CameraProjection.ORTHOGRAPHIC
+				camera.fovy = 20.0 // near plane width in CAMERA_ORTHOGRAPHIC
+				rl.CameraYaw(&camera, -135 * rl.DEG2RAD, true)
+				rl.CameraPitch(&camera, -45 * rl.DEG2RAD, true, true, false)
+			} else if (camera.projection == rl.CameraProjection.ORTHOGRAPHIC) {
+				// Reset to default view
+				cameraMode = rl.CameraMode.FIRST_PERSON
+				camera.position = {0.0, 2.0, 10.0}
+				camera.target = {0.0, 2.0, 0.0}
+				camera.up = {0.0, 1.0, 0.0}
+				camera.projection = rl.CameraProjection.PERSPECTIVE
+				camera.fovy = 60.0
+			}
+		}
+		rl.UpdateCamera(&camera, cameraMode)
+
+		/// Movement
 		move_forward: f32 = 1.0 if (rl.IsKeyDown(Key.W) || rl.IsKeyDown(Key.UP)) else 0.0
 		move_down: f32 = 1.0 if (rl.IsKeyDown(Key.S) || rl.IsKeyDown(Key.DOWN)) else 0.0
 		move_right: f32 = 1.0 if (rl.IsKeyDown(Key.D) || rl.IsKeyDown(Key.RIGHT)) else 0.0
@@ -60,9 +95,6 @@ main :: proc() {
 		}
 
 		fmt.printfln("POSITION: %v\n", camera.position)
-		rl.DisableCursor()
-		rl.SetTargetFPS(60)
-		rl.UpdateCamera(&camera, rl.CameraMode.FIRST_PERSON)
 		rl.UpdateCameraPro(
 			&camera,
 			camera_translation,
@@ -71,21 +103,23 @@ main :: proc() {
 		)
 
 		rl.BeginDrawing()
-		rl.ClearBackground(rl.Color{0, 0, 255, 0})
+		rl.ClearBackground(rl.Color{50, 50, 50, 1})
 
 		rl.BeginMode3D(camera)
 
-		rl.DrawPlane({0, -1, 0}, {100, 100}, rl.Color{255, 255, 255, 1})
-		// rl.DrawCube({-6, 2.5, 0}, 1, 5, 32, rl.Color{0, 0, 255, 1})
-		// rl.DrawCube({6, 2.5, 0}, 1, 5, 32, rl.Color{0, 255, 0, 1})
-		// rl.DrawCube({0, 2.5, 10}, 32, 5, 1, rl.Color{255, 0, 0, 1})
+		rl.DrawPlane({0, -1, 0}, {100, 100}, rl.Color{0, 0, 255, 1})
 		for i in 0 ..< MAX_COLUMNS {
 			rl.DrawCube(positions[i], 2.0, heights[i], 2.0, colors[i])
-			rl.DrawCubeWires(positions[i], 2.0, heights[i], 2.0, rl.Color{255, 255, 255, 1})
+			rl.DrawCubeWires(positions[i], 5.0, heights[i], 2.0, rl.Color{255, 255, 255, 1})
+		}
+		if cameraMode == rl.CameraMode.THIRD_PERSON {
+			rl.DrawCube(camera.target, 0.5, 0.5, 0.5, rl.Color{100, 0, 100, 1})
+			rl.DrawCubeWires(camera.target, 0.5, 0.5, 0.5, rl.Color{255, 255, 255, 1})
 		}
 
-
 		rl.EndMode3D()
+
+		draw_hud()
 
 		rl.EndDrawing()
 	}
